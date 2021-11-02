@@ -26,8 +26,8 @@ if [ "$NARGS" -lt 1 ]; then
 	echo "*** OPTIONAL ARGS ***"
 
 	echo "=== AEGEAN OPTIONS ==="
-	echo "--bkg-gridsize=[GRID_SIZE] - The [x,y] size of the grid to use [Default = ~4* beam size square]"
-	echo "--bkg-boxsize=[BOX_SIZE] - The [x,y] size of the box over which the rms/bkg is calculated [Default = 5*grid]"
+	echo "--bkggrid=[GRID_SIZE] - The [x,y] size of the grid to use [Default = ~4* beam size square]"
+	echo "--bkgbox=[BOX_SIZE] - The [x,y] size of the box over which the rms/bkg is calculated [Default = 5*grid]"
 	echo "--seedthr=[SEED_THR] - The clipping value (in sigmas) for seeding islands [default: 5]"
 	echo "--mergethr=[MERGE_THR] - The clipping value (in sigmas) for growing islands [default: 4]"
 	echo "--fit-maxcomponents=[NCOMP] - If more than *maxsummits* summits are detected in an island, no fitting is done, only estimation"
@@ -43,8 +43,9 @@ if [ "$NARGS" -lt 1 ]; then
 	echo "--copywaittime=[COPY_WAIT_TIME] - Time to wait after copying output files (default=30)"
 	echo "--save-summaryplot - Save summary plot with image+regions"
 	echo "--save-catalog-to-json - Save catalogs to json format"
-	echo "--save-bkgmaps - Save bkg & noise maps"
-
+	echo "--save-bkgmap - Save bkg map"
+	echo "--save-rmsmap - Save noise map"
+	echo "--save-regions - Save DS9 regions (default=no)"
 	echo ""
 
 	echo "=========================="
@@ -71,7 +72,9 @@ FIT_MAX_COMPONENTS="5"
 SEED_THR="5"
 MERGE_THR="4"
 SAVE_SUMMARY_PLOT=false
-SAVE_BKG_MAPS=false
+SAVE_BKG_MAP=false
+SAVE_RMS_MAP=false
+SAVE_DS9REGIONS=false
 SAVE_CATALOG_TO_JSON=false
 REDIRECT_LOGS=true
 RUN_SCRIPT=false
@@ -85,10 +88,10 @@ do
 		--inputfile=*)
     	INPUT_IMAGE=`echo $item | /bin/sed 's/[-a-zA-Z0-9]*=//'`
     ;;
-		--bkg-boxsize=*)
+		--bkgbox=*)
     	BKG_BOX_SIZE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
-		--bkg-gridsize=*)
+		--bkggrid=*)
     	BKG_GRID_SIZE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
 		--seedthr=*)
@@ -103,11 +106,17 @@ do
 		--save-summaryplot*)
     	SAVE_SUMMARY_PLOT=true
     ;;
-		--save-bkgmaps*)
-    	SAVE_BKG_MAPS=true
+		--save-bkgmap*)
+    	SAVE_BKG_MAP=true
+    ;;
+		--save-rmsmap*)
+    	SAVE_RMS_MAP=true
     ;;
 		--save-catalog-to-json*)
     	SAVE_CATALOG_TO_JSON=true
+    ;;
+		--save-regions*)
+    	SAVE_DS9REGIONS=true
     ;;
 		--jobdir=*)
     	JOB_DIR=`echo "$item" | /bin/sed 's/[-a-zA-Z0-9]*=//'`
@@ -307,12 +316,16 @@ generate_exec_script(){
 
 			echo " "
 
-			if [ $SAVE_BKG_MAPS = false ]; then
+			if [ $SAVE_BKG_MAP = false ]; then
 				echo "if [ -e $JOB_DIR/$bkg_file ] ; then"
 				echo "  echo \"INFO: Removing bkg map file $bkg_file ...\""
 		    echo "  rm $JOB_DIR/$bkg_file"
 				echo "fi"
-				echo ""	
+			fi
+
+			echo " "
+		
+			if [ $SAVE_RMS_MAP = false ]; then
 				echo "if [ -e $JOB_DIR/$rms_file ] ; then"	
 				echo "  echo \"INFO: Removing rms map file $rms_file ...\""
 				echo "  rm $JOB_DIR/$rms_file"
@@ -320,6 +333,23 @@ generate_exec_script(){
 			fi
 
       echo " "
+
+			
+			if [ $SAVE_DS9REGIONS = false ]; then
+				echo "if [ -e $JOB_DIR/$ds9_isle_file ] ; then"	
+				echo "  echo \"INFO: Removing island DS9 region file $ds9_isle_file ...\""
+				echo "  rm $JOB_DIR/$ds9_isle_file"
+				echo "fi"
+
+				echo " "
+
+				echo "if [ -e $JOB_DIR/$ds9_comp_file ] ; then"	
+				echo "  echo \"INFO: Removing island DS9 region file $ds9_comp_file ...\""
+				echo "  rm $JOB_DIR/$ds9_comp_file"
+				echo "fi"
+			fi
+
+			echo " "
 
       echo 'echo "*************************************************"'
       echo 'echo "****         COPY DATA TO OUTDIR             ****"'
@@ -367,7 +397,7 @@ generate_exec_script(){
 
 				echo " "
 
-				echo "# - Copy bkg maps"
+				echo "# - Copy bkg & rms maps"
 				echo "if [ -e $JOB_DIR/$bkg_file ] ; then"
 				echo "  echo \"INFO: Copying bkg map file $bkg_file to $JOB_OUTDIR ...\""
 				echo "  cp $JOB_DIR/$bkg_file $JOB_OUTDIR"
@@ -423,11 +453,6 @@ echo "INFO: Moving to job directory $JOB_DIR ..."
 cd $JOB_DIR
 
 # - Generate run script
-#filename_base=$(/usr/bin/basename "$INPUT_IMAGE")
-#file_extension="${filename_base##*.}"
-#filename_base_noext="${filename_base%.*}"
-#shfile="run_$filename_base_noext"'.sh'
-
 echo "INFO: Creating run script file $shfile ..."
 generate_exec_script "$shfile"
 
