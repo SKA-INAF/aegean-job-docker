@@ -38,7 +38,7 @@ if [ "$NARGS" -lt 1 ]; then
 	echo "--run - Run the generated run script on the local shell. If disabled only run script will be generated for later run."	
 	echo "--no-logredir - Do not redirect logs to output file in script "
 	echo "--jobdir=[PATH] - Directory where to run job (default=/home/[RUNUSER]/aegean-job)"
-	echo "--joboutdir=[PATH] - Directory where to place output products (same of rundir if empty) (default=empty)"
+	echo "--outdir=[OUTPUT_DIR] - Output directory where to put run output file (default=pwd)"
 	echo "--waitcopy - Wait a bit after copying output files to output dir (default=no)"
 	echo "--copywaittime=[COPY_WAIT_TIME] - Time to wait after copying output files (default=30)"
 	echo "--save-summaryplot - Save summary plot with image+regions"
@@ -121,8 +121,8 @@ do
 		--jobdir=*)
     	JOB_DIR=`echo "$item" | /bin/sed 's/[-a-zA-Z0-9]*=//'`
     ;;
-		--joboutdir=*)
-    	JOB_OUTDIR=`echo "$item" | /bin/sed 's/[-a-zA-Z0-9]*=//'`
+		--outdir=*)
+    	JOB_OUTDIR=`echo $item | /bin/sed 's/[-a-zA-Z0-9]*=//'`
     ;;
 		--waitcopy*)
     	WAIT_COPY=true
