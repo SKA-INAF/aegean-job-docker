@@ -1,53 +1,5 @@
 #!/bin/bash
 
-#######################################
-##         CHECK ARGS
-#######################################
-NARGS="$#"
-echo "INFO: NARGS= $NARGS"
-
-if [ "$NARGS" -lt 1 ]; then
-	echo "ERROR: Invalid number of arguments...see script usage!"
-  echo ""
-	echo "**************************"
-  echo "***     USAGE          ***"
-	echo "**************************"
- 	echo "$0 [ARGS]"
-	echo ""
-	echo "=========================="
-	echo "==    ARGUMENT LIST     =="
-	echo "=========================="
-	echo "*** MANDATORY ARGS ***"
-	echo "--image=[FILENAME] - Input FITS file"
-	echo ""
-
-	echo "*** OPTIONAL ARGS ***"
-
-	echo "=== AEGEAN OPTIONS ==="
-	echo "--bkg-gridsize=[GRID_SIZE] - The [x,y] size of the grid to use [Default = ~4* beam size square]"
-	echo "--bkg-boxsize=[BOX_SIZE] - The [x,y] size of the box over which the rms/bkg is calculated [Default = 5*grid]"
-	echo "--seedthr=[SEED_THR] - The clipping value (in sigmas) for seeding islands [default: 5]"
-	echo "--mergethr=[MERGE_THR] - The clipping value (in sigmas) for growing islands [default: 4]"
-	echo "--fit-maxcomponents=[NCOMP] - If more than *maxsummits* summits are detected in an island, no fitting is done, only estimation"
-	echo ""
-
-	echo "=== RUN OPTIONS ==="
-	echo "--runuser=[RUNUSER] - Username to be used when running script (default=cutex)"
-	echo "--change-runuser=[VALUE] - Change username when running script (0/1) (default=1)"
-	echo "--ncores=[NCORES] - Number of cores to use [Default = all available]"
-	echo "--jobdir=[PATH] - Directory where to run job (default=/home/[RUNUSER]/aegean-job)"
-	echo "--joboutdir=[PATH] - Directory where to place output products (same of rundir if empty) (default=empty)"
-
-	echo ""
-	echo "=== VOLUME MOUNT OPTIONS ==="
-	echo "--rclone-copy-wait=[COPY_WAIT_TIME] - Time to wait after copying output files (default=30)"
-	
-	echo ""
-	 	
-
-	echo "=========================="
-  exit 1
-fi
 
 ##########################
 ##    PARSE ARGS
@@ -56,20 +8,8 @@ RUNUSER="aegean"
 CHANGE_USER=true
 JOB_DIR=""
 JOB_OUTDIR=""
-#JOB_ARGS=""
-
-# - AEGEAN OPTIONS
-NCORES="1"
+JOB_ARGS=""
 INPUT_IMAGE=""
-#BKG_BOX_SIZE="5"
-#BKG_GRID_SIZE="4"
-BKG_BOX_SIZE=""
-BKG_GRID_SIZE=""
-FIT_MAX_COMPONENTS="5"
-SEED_THR="5"
-MERGE_THR="4"
-SAVE_SUMMARY_PLOT=false
-SAVE_BKG_MAPS=false
 
 # - RCLONE OPTIONS
 MOUNT_RCLONE_VOLUME=0
@@ -84,31 +24,6 @@ echo "ARGS: $@"
 for item in "$@"
 do
 	case $item in
-		
-		--image=*)
-    	INPUT_IMAGE=`echo $item | /bin/sed 's/[-a-zA-Z0-9]*=//'`
-    ;;
-		--bkg-boxsize=*)
-    	BKG_BOX_SIZE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
-    ;;
-		--bkg-gridsize=*)
-    	BKG_GRID_SIZE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
-    ;;
-		--seedthr=*)
-    	SEED_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
-    ;;
-		--mergethr=*)
-    	MERGE_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
-    ;;
-		--fit-maxcomponents=*)
-    	FIT_MAX_COMPONENTS=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
-    ;;
-		--save-summaryplot*)
-    	SAVE_SUMMARY_PLOT=true
-    ;;
-		--save-bkgmaps*)
-    	SAVE_BKG_MAPS=true
-    ;;
 		--runuser=*)
     	RUNUSER=`echo $item | /bin/sed 's/[-a-zA-Z0-9]*=//'`
     ;;
@@ -126,12 +41,13 @@ do
 		--joboutdir=*)
     	JOB_OUTDIR=`echo "$item" | /bin/sed 's/[-a-zA-Z0-9]*=//'`
     ;;
-#		--jobargs=*)
-#    	JOB_ARGS=`echo "$item" | /bin/sed 's/[-a-zA-Z0-9]*=//'`
-#    ;;
-		--ncores=*)
-      NCORES=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
-    ;;		
+		--jobargs=*)
+    	JOB_ARGS=`echo "$item" | /bin/sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--inputfile=*)
+    	INPUT_IMAGE=`echo $item | /bin/sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+			
 		--mount-rclone-volume=*)
     	MOUNT_RCLONE_VOLUME=`echo $item | /bin/sed 's/[-a-zA-Z0-9]*=//'`
     ;;
@@ -160,16 +76,13 @@ do
 done
 
 
-# - Check job args
-if [ "$INPUT_IMAGE" = "" ]; then
-	echo "ERROR: Empty INPUT_IMAGE argument (hint: you must specify image at least)!"
-	exit 1
+# - Check options
+if [ "$JOB_ARGS" = "" ]; then
+	if [ "$INPUTFILE" = "" ]; then
+	  echo "ERROR: Empty INPUTFILE argument (hint: you must specify an input file path)!"
+	  exit 1
+	fi
 fi
-
-#if [ "$JOB_ARGS" = "" ]; then
-#	echo "ERROR: Empty JOB_ARGS argument (hint: you must specify image at least)!"
-#	exit 1
-#fi
 
 
 ###############################
@@ -233,162 +146,36 @@ if [ "$JOB_DIR" == "" ]; then
 	fi
 fi
 
-# - Extract base filename
-filename_base=$(basename "$INPUT_IMAGE")
-file_extension="${filename_base##*.}"
-filename_base_noext="${filename_base%.*}"
+# - Set options
+DATA_OPTIONS=""
+if [ "$INPUTFILE" != "" ]; then
+	DATA_OPTIONS="--inputfile=$INPUTFILE "
+fi
 
-# - Set RMS & background map filenames
-rms_file="$filename_base_noext"'_rms.fits'
-bkg_file="$filename_base_noext"'_bkg.fits'
-	
-# - Set catalog filename
-catalog_file="catalog-$filename_base_noext"'.dat'
-catalog_tab_file="catalog-$filename_base_noext"'.tab'
+RUN_OPTIONS="--run --no-logredir --jobdir=$JOB_DIR --save-summaryplot --save-catalog-to-json "
+if [ "$JOB_OUTDIR" != "" ]; then
+	RUN_OPTIONS="$RUN_OPTIONS --outdir=$JOB_OUTDIR "
+	if [ "$MOUNT_RCLONE_VOLUME" = "1" ] ; then
+		RUN_OPTIONS="$RUN_OPTIONS --waitcopy --copywaittime=$RCLONE_COPY_WAIT_TIME "
+	fi	
+fi
 
-# - Set DS9 region filename
-ds9_file="ds9-$filename_base_noext"'.reg'
-ds9_isle_file="ds9-$filename_base_noext"'_isle.reg'
-ds9_comp_file="ds9-$filename_base_noext"'_comp.reg'
+JOB_OPTIONS="$RUN_OPTIONS $DATA_OPTIONS $JOB_ARGS "
 
-
-# - Set logfile
-logfile="output_$filename_base_noext"'.log'
-
-# - Define summary output plot filename
-summary_plot_file="plot_$filename_base_noext"'.png'
 
 ###############################
 ##    RUN AEGEAN JOB
 ###############################
-# - Enter job dir
-echo "INFO: Entering job dir $JOB_DIR ..."
-cd $JOB_DIR
-
-# - Run BANE
-EXE="BANE"
-BKG_GRID_OPTS=""
-if [ "$BKG_GRID_SIZE" != "" ]; then
-	BKG_GRID_OPTS="--grid=$BKG_GRID_SIZE $BKG_GRID_SIZE "
-fi
-BKG_BOX_OPTS=""
-if [ "$BKG_BOX_SIZE" != "" ]; then
-	BKG_BOX_OPTS="--box=$BKG_BOX_SIZE $BKG_BOX_SIZE "
-fi
-BKG_OPTS="--cores=$NCORES $BKG_GRID_OPTS $BKG_BOX_OPTS "
-
-ARGS="$BKG_OPTS $filename_base"
+# - Define run command & args
+EXE="/home/$RUNUSER/aegean_submitter.sh"
 
 if [ "$CHANGE_USER" = true ]; then
-	CMD="runuser -l $RUNUSER -g $RUNUSER -c '""$EXE $ARGS""'"
+	CMD="runuser -l $RUNUSER -g $RUNUSER -c'""$EXE $JOB_OPTIONS""'"
 else
-	CMD="$EXE $ARGS"
+	CMD="$EXE $JOB_OPTIONS"
 fi
 
-echo "INFO: Computing background & noise maps (CMD=$CMD) ..."
+# - Run job
+echo "INFO: Running job command: $CMD ..."
 eval "$CMD"
-BANE_STATUS=$?
-
-if [ "$BANE_STATUS" != "0" ]; then
-	echo "ERROR: BANE failed with code=$BANE_STATUS ..."	
-	exit 1
-fi
-
-echo " "
-
-# - Run source finder
-EXE="aegean"
-ARGS="--find --cores=$NCORES --noise=$rms_file --background=$bkg_file --maxsummits=$FIT_MAX_COMPONENTS --seedclip=$SEED_THR --floodclip=$MERGE_THR --island --out=$catalog_file --table=$ds9_file,$catalog_tab_file $filename_base"
-if [ "$CHANGE_USER" = true ]; then
-	CMD="runuser -l $RUNUSER -g $RUNUSER -c '""$EXE $ARGS""'"
-else
-	CMD="$EXE $ARGS"
-fi
-
-echo "INFO: Extracting sources (CMD=$CMD) ..."
-eval "$CMD"
-JOB_STATUS=$?
-
-# - Clear data
-if [ $SAVE_BKG_MAPS = false ]; then
-	if [ -e $JOB_DIR/$bkg_file ] ; then	
-		echo "INFO: Removing bkg map file $bkg_file ..."
-		rm $JOB_DIR/$bkg_file
-	fi
-	if [ -e $JOB_DIR/$rms_file ] ; then	
-		echo "INFO: Removing rms map file $rms_file ..."
-		rm $JOB_DIR/$rms_file
-	fi
-fi
-
-# - Check status
-if [ "$JOB_STATUS" != "0" ]; then
-	echo "ERROR: Aegean failed with code=$JOB_STATUS ..."
-	exit 1
-fi
-
-# - Make summary plot
-if [ $SAVE_SUMMARY_PLOT = true ]; then
-	if [ -e $JOB_DIR/$ds9_comp_file ] ; then	
-		echo "INFO: Making summary plot with input image + extracted source islands ..."
-		draw_img.py --img=$filename_base --region=$ds9_comp_file --wcs --zmin=0 --zmax=0 --cmap=gray_r --contrast=0.3 --save --outfile=$summary_plot_file
-	fi
-fi
-
-# - Copy output data to output directory
-if [ "$JOB_DIR" != "$JOB_OUTDIR" ]; then
-	echo "INFO: Copying job outputs in $JOB_OUTDIR ..."
-	ls -ltr $JOB_DIR
-
-	# - Copy output plot(s)
-	png_count=`ls -1 *.png 2>/dev/null | wc -l`
-  if [ $png_count != 0 ] ; then
-		echo "INFO: Copying output plot file(s) to $JOB_OUTDIR ..."
-		cp *.png $JOB_OUTDIR
-	fi
-
-	# - Copy output jsons
-	json_count=`ls -1 *.json 2>/dev/null | wc -l`
-	if [ $json_count != 0 ] ; then
-		echo "INFO: Copying output json file(s) to $JOB_OUTDIR ..."
-		cp *.json $JOB_OUTDIR
-	fi
-
-	# - Copy output tables
-	tab_count=`ls -1 *.tab 2>/dev/null | wc -l`
-	if [ $tab_count != 0 ] ; then
-		echo "INFO: Copying output table file(s) to $JOB_OUTDIR ..."
-		cp *.tab $JOB_OUTDIR
-	fi
-
-	# - Copy output regions
-	reg_count=`ls -1 *.reg 2>/dev/null | wc -l`
-	if [ $reg_count != 0 ] ; then
-		echo "INFO: Copying output region file(s) to $JOB_OUTDIR ..."
-		cp *.reg $JOB_OUTDIR
-	fi
-
-	# - Copy bkg maps
-	if [ -e $JOB_DIR/$bkg_file ] ; then	
-		echo "INFO: Copying bkg map file $bkg_file to $JOB_OUTDIR ..."
-		cp $JOB_DIR/$bkg_file $JOB_OUTDIR
-	fi
-	if [ -e $JOB_DIR/$rms_file ] ; then	
-		echo "INFO: Copying rms map file $rms_file to $JOB_OUTDIR ..."
-		cp $JOB_DIR/$rms_file $JOB_OUTDIR
-	fi  
-
-	# - Show output directory
-	echo "INFO: Show files in $JOB_OUTDIR ..."
-	ls -ltr $JOB_OUTDIR
-
-	# - Wait a bit after copying data
-	#   NB: Needed if using rclone inside a container, otherwise nothing is copied
-	if [ "$MOUNT_RCLONE_VOLUME" = "1" ] ; then
-		echo "INFO: Sleeping $RCLONE_COPY_WAIT_TIME seconds to allow out file copy ..."
-		sleep $RCLONE_COPY_WAIT_TIME
-	fi
-
-fi
-
 
