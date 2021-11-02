@@ -1,0 +1,122 @@
+FROM ubuntu:16.04
+MAINTAINER Simone Riggi "simone.riggi@gmail.com"
+
+######################################
+##   DEFINE CUSTOMIZABLE ARGS/ENVS
+######################################
+# - AEGEAN RUN OPTIONS
+ARG USER_ARG="aegean"
+ENV USER $USER_ARG
+
+ARG CHANGE_RUNUSER_ARG=1
+ENV CHANGE_RUNUSER $CHANGE_RUNUSER_ARG
+
+ARG JOB_OPTIONS_ARG=""
+ENV JOB_OPTIONS $JOB_OPTIONS_ARG
+
+ARG INPUTFILE_ARG=""
+ENV INPUTFILE $INPUTFILE_ARG
+
+ARG JOB_DIR_ARG=""
+ENV JOB_DIR $JOB_DIR_ARG
+
+ARG JOB_OUTDIR_ARG=""
+ENV JOB_OUTDIR $JOB_OUTDIR_ARG
+
+# - RCLONE OPTIONS
+ARG MOUNT_RCLONE_VOLUME_ARG=0
+ENV MOUNT_RCLONE_VOLUME $MOUNT_RCLONE_VOLUME_ARG
+
+ARG MOUNT_VOLUME_PATH_ARG="/mnt/storage"
+ENV MOUNT_VOLUME_PATH $MOUNT_VOLUME_PATH_ARG
+
+ARG RCLONE_REMOTE_STORAGE_ARG="neanias-nextcloud"
+ENV RCLONE_REMOTE_STORAGE $RCLONE_REMOTE_STORAGE_ARG
+
+ARG RCLONE_REMOTE_STORAGE_PATH_ARG="."
+ENV RCLONE_REMOTE_STORAGE_PATH $RCLONE_REMOTE_STORAGE_PATH_ARG
+
+ARG RCLONE_MOUNT_WAIT_TIME_ARG=10
+ENV RCLONE_MOUNT_WAIT_TIME $RCLONE_MOUNT_WAIT_TIME_ARG
+
+ARG RCLONE_COPY_WAIT_TIME_ARG=30
+ENV RCLONE_COPY_WAIT_TIME $RCLONE_COPY_WAIT_TIME_ARG
+
+
+ENV PYTHONPATH_BASE ${PYTHONPATH}
+
+##########################################################
+##     INSTALL SYS LIBS
+##########################################################
+# - Install OS packages
+RUN apt-get update && apt-get install -y software-properties-common curl bzip2 unzip nano
+#RUN apt-get update && apt-get install -y software-properties-common apt-utils curl binutils libtool pkg-config build-essential autoconf automake debconf-utils software-properties-common dpkg-dev git cmake wget bzip2 nano unzip locate less ca-certificates iputils-ping nmap dnsutils libcurl3 openssl libssl-dev uuid-dev libcap-dev libpcre3-dev util-linux openssh-client openssh-server 
+
+# - Reinstall
+#RUN apt-get install --reinstall python3-pkg-resources
+
+# - Install python3.6
+RUN unset PYTHONPATH && add-apt-repository ppa:deadsnakes/ppa && apt-get update && apt-get install -y python3.6 python3.6-dev 
+
+# - Install pip3.6
+RUN unset PYTHONPATH && curl https://bootstrap.pypa.io/get-pip.py | python3.6
+
+# - Make python3.6 as the default
+RUN rm /usr/bin/python3 && ln -s /usr/bin/python3.6 /usr/bin/python3
+
+
+##########################################################
+##     CREATE USER
+##########################################################
+# - Create user & set permissions
+RUN adduser --disabled-password --gecos "" $USER && \
+    mkdir -p /home/$USER && \
+    chown -R $USER:$USER /home/$USER
+
+######################################
+##     INSTALL RCLONE
+######################################
+# - Install fuse
+RUN apt-get update && apt-get --no-install-recommends install -y fuse
+
+# - Allow other non-root users to mount fuse volumes
+RUN sed -i "s/#user_allow_other/user_allow_other/" /etc/fuse.conf
+
+# - Install rclone
+RUN curl https://rclone.org/install.sh | bash
+
+######################################
+##     INSTALL PYTHON MODULES
+######################################
+# - Install python modules
+RUN unset PYTHONPATH && pip3.6 install astropy regions matplotlib shapely importlib-metadata
+
+######################################
+##     INSTALL AEGEAN
+######################################
+# Installation notes: https://github.com/PaulHancock/Aegean
+# NB: see credits
+RUN pip3.6 install AegeanTools
+   
+######################################
+##     RUN
+######################################
+# - Copy run script
+COPY run_job.sh /home/$USER/run_job.sh
+RUN chmod +x /home/$USER/run_job.sh
+
+# - Copy other scripts
+COPY draw_img.py /home/$USER/draw_img.py
+RUN chmod +x /home/$USER/draw_img.py
+
+# - Add dir to PATH
+ENV PATH ${PATH}:/home/$USER
+
+# - Run container
+#CMD ["sh","-c","/home/$USER/run_job.sh --runuser=$USER --change-runuser=$CHANGE_RUNUSER --inputfile=$INPUTFILE --jobdir=$JOB_DIR --joboutdir=$JOB_OUTDIR --mount-rclone-volume=$MOUNT_RCLONE_VOLUME --mount-volume-path=$MOUNT_VOLUME_PATH --rclone-remote-storage=$RCLONE_REMOTE_STORAGE --rclone-remote-storage-path=$RCLONE_REMOTE_STORAGE_PATH --rclone-mount-wait=$RCLONE_MOUNT_WAIT_TIME --rclone-copy-wait=$RCLONE_COPY_WAIT_TIME --jobargs=\"$JOB_OPTIONS\""]
+
+RUN echo "Command is: /home/$USER/run_job.sh --runuser=$USER --change-runuser=$CHANGE_RUNUSER --inputfile=$INPUTFILE --jobdir=$JOB_DIR --joboutdir=$JOB_OUTDIR --mount-rclone-volume=$MOUNT_RCLONE_VOLUME --mount-volume-path=$MOUNT_VOLUME_PATH --rclone-remote-storage=$RCLONE_REMOTE_STORAGE --rclone-remote-storage-path=$RCLONE_REMOTE_STORAGE_PATH --rclone-mount-wait=$RCLONE_MOUNT_WAIT_TIME --rclone-copy-wait=$RCLONE_COPY_WAIT_TIME \"$JOB_OPTIONS\""
+
+CMD ["/home/$USER/run_job.sh --runuser=$USER --change-runuser=$CHANGE_RUNUSER --inputfile=$INPUTFILE --jobdir=$JOB_DIR --joboutdir=$JOB_OUTDIR --mount-rclone-volume=$MOUNT_RCLONE_VOLUME --mount-volume-path=$MOUNT_VOLUME_PATH --rclone-remote-storage=$RCLONE_REMOTE_STORAGE --rclone-remote-storage-path=$RCLONE_REMOTE_STORAGE_PATH --rclone-mount-wait=$RCLONE_MOUNT_WAIT_TIME --rclone-copy-wait=$RCLONE_COPY_WAIT_TIME \"$JOB_OPTIONS\""]
+
+
