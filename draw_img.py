@@ -36,8 +36,8 @@ from astropy.visualization import make_lupton_rgb
 #import aplpy
 
 import regions
-from regions import DS9Parser
-from regions import read_ds9
+##from regions import DS9Parser  ## DISABLED AS DEPRECATED
+##from regions import read_ds9   ## DISABLED AS DEPRECATED
 
 from shapely.geometry import Polygon
 
@@ -122,8 +122,13 @@ def main():
 	#===========================
 	if regionfile!="":
 		logger.info("Reading region file %s ..." % regionfile)
-		regs= regions.read_ds9(regionfile)
-
+		
+		try:
+			regs= regions.read_ds9(regionfile)
+		except Exception as e:
+			logger.warning("read_ds9 failed (err=%s), trying another method..." % (str(e)))	
+			regs= regions.Regions.read(regionfile, format='ds9')
+			
 	#===========================
 	#==   READ IMAGE
 	#===========================
