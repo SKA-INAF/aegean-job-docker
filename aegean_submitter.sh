@@ -176,6 +176,8 @@ bkg_file="$filename_base_noext"'_bkg.fits'
 # - Set catalog filename
 catalog_file="catalog-$filename_base_noext"'.dat'
 catalog_tab_file="catalog-$filename_base_noext"'.tab'
+island_catalog_tab_file="catalog-$filename_base_noext"'_isle.tab'
+component_catalog_tab_file="catalog-$filename_base_noext"'_comp.tab'
 
 # - Set DS9 region filename
 ds9_file="ds9-$filename_base_noext"'.reg'
@@ -290,6 +292,18 @@ generate_exec_script(){
 
 			echo " "
 
+			if [ $SAVE_CATALOG_TO_JSON = true ]; then
+      	echo 'echo "*************************************************"'
+      	echo 'echo "****         MAKE JSON CATALOG               ****"'
+      	echo 'echo "*************************************************"'
+      
+				echo "if [ -e $JOB_DIR/$island_catalog_tab_file ] ; then"
+				echo "  echo \"INFO: Making json catalog from ascii island+component catalogues ...\""
+				echo "  make_json_catalog.py --inputfile_island=$island_catalog_tab_file --inputfile_comp=$component_catalog_tab_file"
+				echo "fi"	
+			fi
+			
+			echo " "
 			
 			if [ $SAVE_SUMMARY_PLOT = true ]; then
       	echo 'echo "*************************************************"'

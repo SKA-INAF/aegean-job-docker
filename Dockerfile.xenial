@@ -112,6 +112,9 @@ RUN chmod +x /home/$USER/aegean_submitter.sh
 COPY draw_img.py /home/$USER/draw_img.py
 RUN chmod +x /home/$USER/draw_img.py
 
+COPY make_json_catalog.py /home/$USER/make_json_catalog.py
+RUN chmod +x /home/$USER/make_json_catalog.py
+
 # - Add dir to PATH
 ENV PATH ${PATH}:/home/$USER
 
