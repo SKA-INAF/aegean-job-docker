@@ -242,12 +242,14 @@ generate_exec_script(){
 			BKG_GRID_OPTS=""
 			if [ "$BKG_GRID_SIZE" != "" ]; then
 				#BKG_GRID_OPTS="--grid=$BKG_GRID_SIZE $BKG_GRID_SIZE "
-				BKG_GRID_OPTS="--grid='""$BKG_GRID_SIZE $BKG_GRID_SIZE""' "
+				#BKG_GRID_OPTS="--grid='""$BKG_GRID_SIZE $BKG_GRID_SIZE""' "
+				BKG_GRID_OPTS="--grid $BKG_GRID_SIZE $BKG_GRID_SIZE "
 			fi
 			BKG_BOX_OPTS=""
 			if [ "$BKG_BOX_SIZE" != "" ]; then
 				#BKG_BOX_OPTS="--box=$BKG_BOX_SIZE $BKG_BOX_SIZE "
-				BKG_BOX_OPTS="--box='""$BKG_BOX_SIZE $BKG_BOX_SIZE""' "
+				#BKG_BOX_OPTS="--box='""$BKG_BOX_SIZE $BKG_BOX_SIZE""' "
+				BKG_BOX_OPTS="--box $BKG_BOX_SIZE $BKG_BOX_SIZE "
 			fi
 			BKG_OPTS="--cores=$NCORES $BKG_GRID_OPTS $BKG_BOX_OPTS "
 
